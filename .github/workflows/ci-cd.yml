@@ -17,11 +17,15 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v2
 
+      - name: Configure DNS
+        run: |
+          echo "nameserver 8.8.8.8" | sudo tee /etc/resolv.conf > /dev/null
+          echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf > /dev/null
+
       - name: Login to Docker Hub
         run: |
           mkdir -p ~/.docker
           echo '{"auths":{"https://index.docker.io/v1/":{"auth":"'$(echo -n "${{ secrets.DOCKERHUB_USERNAME }}:${{ secrets.DOCKERHUB_PASSWORD }}" | base64 | tr -d '\n')'"}}}' > ~/.docker/config.json
-          cat ~/.docker/config.json
 
       - name: Build & Push Frontend
         uses: docker/build-push-action@v4
@@ -33,23 +37,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build & Push Backend
-        uses: docker/build-push-action@v4
-        with:
-          context: backend
-          file: backend/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build & Push Backend
-        uses: docker/build-push-action@v4
-        with:
-          context: backend
-          file: backend/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
+      - name: Verify network connectivity
+        run: |
+          ping -c 3 docker.io
+          curl -v https://index.docker.io/v2/
 
   preprod:
     name: Deploy to Preprod
