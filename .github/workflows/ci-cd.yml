@@ -20,10 +20,11 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ env.DOCKERHUB_USER }}
           password: ${{ env.DOCKERHUB_TOKEN }}
+          registry: docker.io
 
       - name: Build & Push Frontend
         run: |
@@ -49,15 +50,15 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy
         run: |
-          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             cd /path/to/preprod
             git pull origin develop
-            docker-compose pull
-            docker-compose up -d --remove-orphans
+            docker compose pull
+            docker compose up -d --remove-orphans
           EOF
 
   prod:
@@ -75,5 +76,5 @@ jobs:
       - name: Deploy to Kubernetes
         run: |
           kubectl apply -f prod/k8s/
-          kubectl rollout status deployment frontend
-          kubectl rollout status deployment backend
+          kubectl rollout status deployment/frontend --timeout=300s
+          kubectl rollout status deployment/backend --timeout=300s
