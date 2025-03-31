@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: wordpress:latest
+          env:
+            - name: WORDPRESS_DB_HOST
+              value: "base-donnee:3306"
+            - name: WORDPRESS_DB_NAME
+              value: "wordpress"
+            - name: WORDPRESS_DB_USER
+              value: "wp_user"
+            - name: WORDPRESS_DB_PASSWORD
+              value: "wp_pass"
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  labels:
+    app: backend
+spec:
+  selector:
+    app: backend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: backend-ingress
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  rules:
+    - host: backend.prod.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 80

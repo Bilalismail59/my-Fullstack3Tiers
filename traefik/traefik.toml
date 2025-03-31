@@ -1,0 +1,5 @@
+[entryPoints]
+  [entryPoints.web]
+    address = ":80"
+[providers]
+  [providers.kubernetesIngress]

@@ -1,0 +1,5 @@
+---
+- name: Déployer la configuration frontend
+  template:
+    src: frontend.yml.j2
+    dest: /etc/frontend/frontend.yml

@@ -1,0 +1,17 @@
+name: SonarQube Analysis
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  sonar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: SonarQube Scan
+        run: |
+          echo "Lancer l'analyse SonarQube..."
+          # Commande pour lancer SonarQube scanner

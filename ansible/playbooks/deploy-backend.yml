@@ -1,0 +1,6 @@
+---
+- name: Déployer le backend (WordPress)
+  hosts: node01
+  become: yes
+  roles:
+    - backend

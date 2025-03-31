@@ -1,0 +1,5 @@
+---
+- name: Déployer la configuration backend (WordPress)
+  template:
+    src: backend.yml.j2
+    dest: /etc/backend/backend.yml

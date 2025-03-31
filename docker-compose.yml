@@ -1,0 +1,82 @@
+services:
+  backend:
+    image: wordpress:latest
+    ports:
+      - "1515:80"  # WordPress accessible sur le port 1515
+    volumes:
+      - ./backend:/var/www/html  # Persistance des données WordPress
+    environment:
+      WORDPRESS_DB_HOST: base_donnee:3306  # Connexion à la base de données
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wp_user
+      WORDPRESS_DB_PASSWORD: wp_pass
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.backend.rule=Host(`backend.local`)"  # Utiliser un nom de domaine personnalisé
+      - "traefik.http.services.backend.loadbalancer.server.port=80"
+    depends_on:
+      - base_donnee  # Dépendance explicite vers la base de données
+
+  base_donnee:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: root_pass
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wp_user
+      MYSQL_PASSWORD: wp_pass
+    volumes:
+      - mysql_data:/var/lib/mysql  # Persistance des données MySQL
+    ports:
+      - "3306:3306"  # MySQL accessible sur le port 3306
+
+  frontend:
+    build:
+      context: ./frontend  # Construire l'image à partir du dossier frontend
+    ports:
+      - "8082:80"  # Frontend accessible sur le port 8082
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.frontend.rule=Host(`frontend.local`)"  # Utiliser un nom de domaine personnalisé
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+    depends_on:
+      - backend  # Dépendance explicite vers le backend
+
+  traefik:
+    image: traefik:v3.0
+    command:
+      - "--api.insecure=true"  # Activer l'API Traefik (non sécurisée, pour le développement uniquement)
+      - "--providers.docker=true"  # Utiliser Docker comme fournisseur de configuration
+      - "--entrypoints.web.address=:80"  # Point d'entrée HTTP
+      - "--entrypoints.websecure.address=:443"  # Point d'entrée HTTPS
+    ports:
+      - "8083:80"  # Traefik accessible sur le port 8083 (HTTP)
+      - "443:443"  # Traefik accessible sur le port 443 (HTTPS)
+      - "8080:8080"  # Dashboard Traefik accessible sur le port 8080
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"  # Accès à l'API Docker
+    labels:
+      - "traefik.enable=true"
+    networks:
+      - web
+
+  netdata:
+    image: netdata/netdata:latest
+    container_name: netdata
+    ports:
+      - "19999:19999"  # Netdata accessible sur le port 19999
+    environment:
+      - NETDATA_CLAIM_TOKEN=<your-token>  # Remplacez par votre token Netdata
+      - NETDATA_CLAIM_URL=<claim-url>  # Remplacez par l'URL de claim Netdata
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.netdata.rule=Host(`netdata.local`)"  # Utiliser un nom de domaine personnalisé
+      - "traefik.http.services.netdata.loadbalancer.server.port=19999"
+    networks:
+      - web
+
+volumes:
+  mysql_data:  # Volume pour persister les données MySQL
+
+networks:
+  web:  # Réseau personnalisé pour connecter les services
+    driver: bridge

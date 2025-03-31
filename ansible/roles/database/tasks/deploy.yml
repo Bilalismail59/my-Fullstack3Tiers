@@ -1,0 +1,5 @@
+---
+- name: Déployer la configuration de la base de données
+  template:
+    src: database.yml.j2
+    dest: /etc/database/database.yml

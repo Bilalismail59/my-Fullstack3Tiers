@@ -1,0 +1,10 @@
+http:
+  routers:
+    my-router:
+      rule: "Host(`backend.local`)"
+      service: my-service
+  services:
+    my-service:
+      loadBalancer:
+        servers:
+          - url: "http://backend-service.production.svc.cluster.local:80"

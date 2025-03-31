@@ -1,0 +1,6 @@
+---
+- name: Déployer la base de données
+  hosts: database
+  become: yes
+  roles:
+    - database

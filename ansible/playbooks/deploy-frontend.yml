@@ -1,0 +1,29 @@
+---
+- name: Déploiement du frontend avec Nginx
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Installer Nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+        update_cache: yes
+
+    - name: Supprimer Apache s'il est installé
+      ansible.builtin.apt:
+        name: apache2
+        state: absent
+
+    - name: Copier les fichiers du frontend dans le répertoire web de Nginx
+      ansible.builtin.copy:
+        src: /mnt/c/Users/ismob/Documents/project/frontend/   # Remplacez par le chemin de votre dossier contenant index.html, style.css, img/, etc.
+        dest: /var/www/html/
+        owner: www-data
+        group: www-data
+        mode: '0755'
+
+    - name: Redémarrer Nginx pour prendre en compte les modifications
+      ansible.builtin.service:
+        name: nginx
+        state: restarted
