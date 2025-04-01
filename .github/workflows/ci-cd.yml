@@ -8,22 +8,23 @@ on:
     paths:
       - 'frontend/**'
       - 'backend/**'
-      - '.github/workflows/ci-cd.yml'  # Déclencher aussi si le workflow change
+      - '.github/workflows/ci-cd.yml'
 
 env:
   DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
   FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/frontend
   BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/backend
+  KUBECONFIG: ${{ github.workspace }}/kubeconfig.yaml  # Définition centralisée
 
 jobs:
   build:
     name: Build & Push Images
-    runs-on: ubuntu-22.04  # Version spécifique pour plus de stabilité
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Pour avoir tout l'historique git
+          fetch-depth: 0
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -36,11 +37,9 @@ jobs:
         with:
           username: ${{ env.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
-          registry: docker.io
 
       - name: Build Frontend
         uses: docker/build-push-action@v4
-        id: build-frontend
         with:
           context: ./frontend
           file: ./frontend/Dockerfile
@@ -55,14 +54,13 @@ jobs:
 
       - name: Build Backend
         uses: docker/build-push-action@v4
-        id: build-backend
         with:
           context: .
           file: backend/Dockerfile
           push: true
           tags: |
-           ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
-           ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}
+            ${{ env.BACKEND_IMAGE }}:latest
+            ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -90,24 +88,36 @@ jobs:
             docker image prune -af
           EOSSH
 
-  k8s:
-    name: Deploy to Production
+  production:
+    name: Deploy to Production (Kubernetes)
     needs: build
     runs-on: ubuntu-22.04
     if: github.ref == 'refs/heads/main'
     steps:
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: 'v1.27.0'  # Version spécifique recommandée
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Deploy to Kubernetes
-        env:
-          KUBECONFIG: ${{ github.workspace }}/kubeconfig.yaml
+      - name: Configure Kubernetes
         run: |
+          # Création sécurisée du fichier kubeconfig
+          mkdir -p ~/.kube
           echo "${{ secrets.KUBECONFIG }}" > $KUBECONFIG
           chmod 600 $KUBECONFIG
-          kubectl apply -f prod/k8s/ --server-side=true
-          kubectl rollout status deployment/frontend --timeout=5m
-          kubectl rollout status deployment/backend --timeout=5m
-          kubectl get pods -n ${{ vars.PROD_NAMESPACE || 'default' }} -o wide
+          
+          # Vérification de la connexion
+          kubectl config view
+          kubectl cluster-info
+          kubectl get nodes
+
+      - name: Deploy to Kubernetes
+        run: |
+          # Application avec vérification
+          kubectl apply -f prod/k8s/ --server-side=true --validate=true
+          
+          # Attente des déploiements avec timeout augmenté
+          kubectl rollout status deployment/frontend --timeout=10m -n ${{ vars.PROD_NAMESPACE || 'default' }}
+          kubectl rollout status deployment/backend --timeout=10m -n ${{ vars.PROD_NAMESPACE || 'default' }}
+          
+          # Vérification finale
+          kubectl get pods,svc,ingress -n ${{ vars.PROD_NAMESPACE || 'default' }} -o wide
+          kubectl get events -n ${{ vars.PROD_NAMESPACE || 'default' }} --sort-by=.metadata.creationTimestamp

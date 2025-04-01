@@ -12,4 +12,4 @@ spec:
           service:
             name: backend-service
             port:
-              number: 8081  # Anciennement 8080
+              number: 80  # Anciennement 8080
