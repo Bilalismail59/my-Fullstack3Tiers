@@ -8,83 +8,106 @@ on:
     paths:
       - 'frontend/**'
       - 'backend/**'
-      - '.github/workflows/ci-cd.yml'
+      - '.github/workflows/ci-cd.yml'  # Déclencher aussi si le workflow change
 
 env:
   DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
-  K8S_NAMESPACE: production
-  KUBECONFIG: /home/runner/.kube/config  # Chemin standard pour kubectl
+  FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/frontend
+  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/backend
 
 jobs:
   build:
     name: Build & Push Images
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04  # Version spécifique pour plus de stabilité
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Pour avoir tout l'historique git
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v2
+        with:
+          driver: docker-container
+          install: true
 
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ env.DOCKERHUB_USER }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
+          registry: docker.io
 
-      - name: Build & Push Frontend
+      - name: Build Frontend
         uses: docker/build-push-action@v4
+        id: build-frontend
         with:
           context: ./frontend
-          tags: |
-            ${{ env.DOCKERHUB_USER }}/frontend:latest
-            ${{ env.DOCKERHUB_USER }}/frontend:${{ github.sha }}
+          file: ./frontend/Dockerfile
           push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:latest
+            ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NODE_ENV=production
 
-      - name: Build & Push Backend
+      - name: Build Backend
         uses: docker/build-push-action@v4
+        id: build-backend
         with:
-          context: ./backend
-          tags: |
-            ${{ env.DOCKERHUB_USER }}/backend:latest
-            ${{ env.DOCKERHUB_USER }}/backend:${{ github.sha }}
+          context: .
+          file: backend/Dockerfile
           push: true
+          tags: |
+           ${{ secrets.DOCKERHUB_USERNAME }}/backend:latest
+           ${{ secrets.DOCKERHUB_USERNAME }}/backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-  k8s-deploy:
-    name: Deploy to Kubernetes
+  preprod:
+    name: Deploy to Preprod
+    needs: build
+    runs-on: ubuntu-22.04
+    if: github.ref == 'refs/heads/develop'
+    steps:
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+
+      - name: Deploy Services
+        env:
+          DOCKERHUB_USER: ${{ env.DOCKERHUB_USER }}
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOSSH'
+            cd /path/to/preprod
+            git pull origin develop
+            docker compose pull --include-deps
+            docker compose up -d --build --remove-orphans
+            docker image prune -af
+          EOSSH
+
+  k8s:
+    name: Deploy to Production
     needs: build
     runs-on: ubuntu-22.04
     if: github.ref == 'refs/heads/main'
     steps:
-      - uses: actions/checkout@v3
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.27.0'  # Version spécifique recommandée
 
-      - name: Configure Kubernetes
+      - name: Deploy to Kubernetes
+        env:
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig.yaml
         run: |
-          mkdir -p ~/.kube
           echo "${{ secrets.KUBECONFIG }}" > $KUBECONFIG
           chmod 600 $KUBECONFIG
-          kubectl config use-context ${{ secrets.K8S_CONTEXT || 'default' }}
-
-      - name: Verify Cluster Access
-        run: |
-          kubectl cluster-info
-          kubectl get nodes
-
-      - name: Deploy Applications
-        run: |
-          # Appliquer les configurations avec vérification
-          kubectl apply -f k8s/ -n ${{ env.K8S_NAMESPACE }} --server-side=true --validate=true
-          
-          # Attendre le déploiement
-          kubectl rollout status deployment/frontend -n ${{ env.K8S_NAMESPACE }} --timeout=5m
-          kubectl rollout status deployment/backend -n ${{ env.K8S_NAMESPACE }} --timeout=5m
-          
-          # Vérification finale
-          kubectl get all -n ${{ env.K8S_NAMESPACE }}
-          kubectl get ingress -n ${{ env.K8S_NAMESPACE }}
-
-      - name: Verify Application Health
-        run: |
-          # Attendre que l'application soit prête
-          sleep 30
-          INGRESS_HOST=$(kubectl get ingress -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.items[0].spec.rules[0].host}')
-          curl -I http://$INGRESS_HOST
+          kubectl apply -f prod/k8s/ --server-side=true
+          kubectl rollout status deployment/frontend --timeout=5m
+          kubectl rollout status deployment/backend --timeout=5m
+          kubectl get pods -n ${{ vars.PROD_NAMESPACE || 'default' }} -o wide
