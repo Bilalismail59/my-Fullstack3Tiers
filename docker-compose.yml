@@ -4,19 +4,28 @@ services:
     ports:
       - "1515:80"  # WordPress accessible sur le port 1515
     volumes:
-      - ./backend:/var/www/html  # Persistance des données WordPress
+      - ./backend:/var/www/html  # Montage du thème/développement
+      - wordpress_plugins:/var/www/html/wp-content/plugins  # Persistance plugins
+      - wordpress_uploads:/var/www/html/wp-content/uploads  # Persistance médias
     environment:
-      WORDPRESS_DB_HOST: base_donnee:3306  # Connexion à la base de données
+      WORDPRESS_DB_HOST: base_donnee:3306
       WORDPRESS_DB_NAME: wordpress
       WORDPRESS_DB_USER: wp_user
       WORDPRESS_DB_PASSWORD: wp_pass
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_DEBUG', true);
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.backend.rule=Host(`backend.local`)"  # Utiliser un nom de domaine personnalisé
+      - "traefik.http.routers.backend.rule=Host(`backend.local`)"
+      - "traefik.http.routers.backend.entrypoints=web"
       - "traefik.http.services.backend.loadbalancer.server.port=80"
     depends_on:
-      - base_donnee  # Dépendance explicite vers la base de données
+      base_donnee:
+        condition: service_healthy
+    networks:
+      - web
 
+ # Base de données MySQL
   base_donnee:
     image: mysql:8
     environment:
@@ -25,21 +34,33 @@ services:
       MYSQL_USER: wp_user
       MYSQL_PASSWORD: wp_pass
     volumes:
-      - mysql_data:/var/lib/mysql  # Persistance des données MySQL
+      - mysql_data:/var/lib/mysql
     ports:
-      - "3306:3306"  # MySQL accessible sur le port 3306
+    - "3306:3306"
+    healthcheck:
+     test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
+     interval: 5s
+     timeout: 5s
+     retries: 10
+    networks:
+    - web
 
+  # Frontend (Nginx)
   frontend:
     build:
-      context: ./frontend  # Construire l'image à partir du dossier frontend
-    ports:
-      - "8082:80"  # Frontend accessible sur le port 8082
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: bilalismail59/frontend:latest  # Nom personnalisé pour Docker Hub
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.frontend.rule=Host(`frontend.local`)"  # Utiliser un nom de domaine personnalisé
+      - "traefik.http.routers.frontend.rule=Host(`frontend.local`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
     depends_on:
-      - backend  # Dépendance explicite vers le backend
+      backend:
+        condition: service_started
+    networks:
+      - web
 
   traefik:
     image: traefik:v3.0
@@ -75,8 +96,10 @@ services:
       - web
 
 volumes:
-  mysql_data:  # Volume pour persister les données MySQL
+  mysql_data:
+  wordpress_plugins:
+  wordpress_uploads:
 
 networks:
-  web:  # Réseau personnalisé pour connecter les services
+  web:
     driver: bridge
