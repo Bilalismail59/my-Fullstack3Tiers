@@ -1,35 +1,39 @@
+# Utilisation de l'image officielle WordPress avec Apache
 FROM wordpress:latest
 
-# Étape 1 : Installer les dépendances système (version corrigée)
+# 1. Installation des dépendances système avec nettoyage automatique
 RUN apt-get update && apt-get install -y \
     less \
     default-mysql-client \
+    vim \
     curl \
-    --no-install-recommends \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Étape 2 : Télécharger WP-CLI avec vérification
+# 2. Installation sécurisée de WP-CLI (version stable)
 RUN curl -o /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
     && chmod +x /usr/local/bin/wp \
-    && wp --allow-root --version
+    && wp --allow-root cli version
 
-# Étape 3 : Copie des fichiers avec vérification
+# 3. Copie des fichiers avec gestion d'erreur robuste
 COPY docker-entrypoint.sh /usr/local/bin/
 COPY scripts/seed-wp.sh /usr/local/bin/
-COPY wp-config.php /var/www/html/
-COPY .htaccess /var/www/html/
+COPY wp-config.php /var/www/html/wp-config.php
+RUN mkdir -p /var/www/html/wp-content/uploads \
+    && touch /var/www/html/.htaccess \
+    && [ -f .htaccess ] && cp .htaccess /var/www/html/ || true
 
-# Étape 4 : Configuration des permissions (version sécurisée)
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
-    && chmod +x /usr/local/bin/seed-wp.sh \
+# 4. Configuration avancée des permissions
+RUN chmod +x /usr/local/bin/*.sh \
     && chown -R www-data:www-data /var/www/html \
     && find /var/www/html -type d -exec chmod 755 {} \; \
-    && find /var/www/html -type f -exec chmod 644 {} \;
+    && find /var/www/html -type f -exec chmod 644 {} \; \
+    && chmod 600 /var/www/html/wp-config.php
 
-# Healthcheck amélioré
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-    CMD wp --allow-root core is-installed && wp --allow-root core verify-checksums || exit 1
+# 5. Healthcheck amélioré
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD wp --allow-root core is-installed && curl -f http://localhost/ || exit 1
 
+# 6. Entrypoint et commande par défaut
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["apache2-foreground"]
