@@ -17,7 +17,7 @@
 
     - name: Copier les fichiers du frontend dans le répertoire web de Nginx
       ansible.builtin.copy:
-        src: /mnt/c/Users/ismob/Documents/project/frontend/   # Remplacez par le chemin de votre dossier contenant index.html, style.css, img/, etc.
+        src: /mnt/c/Users/ismob/Documents/my-Fullstack3Tiers/frontend/   # Remplacez par le chemin de votre dossier contenant index.html, style.css, img/, etc.
         dest: /var/www/html/
         owner: www-data
         group: www-data
@@ -27,3 +27,21 @@
       ansible.builtin.service:
         name: nginx
         state: restarted
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -80,16 +80,18 @@ jobs:
         env:
           DOCKERHUB_USER: ${{ env.DOCKERHUB_USER }}
         run: |
-          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOSSH'
-            cd /path/to/preprod
-            git pull origin develop
-            docker compose pull --include-deps
-            docker compose up -d --build --remove-orphans
-            docker image prune -af
+          ssh -o StrictHostKeyChecking=no \
+          ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOSSH'
+          cd /path/to/preprod
+          git pull origin develop
+          docker compose down
+          docker compose pull --include-deps
+          docker compose up -d --build --remove-orphans
+          docker image prune -af
           EOSSH
-
+  
   production:
-    name: Deploy to Production (Kubernetes)
+    name: Deploy to Production ()
     needs: build
     runs-on: ubuntu-22.04
     if: github.ref == 'refs/heads/main'
@@ -99,25 +101,30 @@ jobs:
 
       - name: Configure Kubernetes
         run: |
-          # Création sécurisée du fichier kubeconfig
+          # Création sécurisée du fichier kubeconfig avec le contenu du secret
           mkdir -p ~/.kube
-          echo "${{ secrets.KUBECONFIG }}" > $KUBECONFIG
-          chmod 600 $KUBECONFIG
+          echo "${{ secrets.KUBECONFIG }}" > "$KUBECONFIG"
+          chmod 600 "$KUBECONFIG"
           
-          # Vérification de la connexion
-          kubectl config view
+          # Vérification de la configuration
+          kubectl config view --raw
           kubectl cluster-info
+          
+          # Liste les noeuds pour vérifier la connexion
           kubectl get nodes
+          
+          # Vérifie l'accès au namespace
+          kubectl get ns ${{ vars.PROD_NAMESPACE || 'default' }}
 
       - name: Deploy to Kubernetes
         run: |
-          # Application avec vérification
+          # Applique les configurations avec validation
           kubectl apply -f prod/k8s/ --server-side=true --validate=true
           
-          # Attente des déploiements avec timeout augmenté
+          # Vérifie l'état des déploiements
           kubectl rollout status deployment/frontend --timeout=10m -n ${{ vars.PROD_NAMESPACE || 'default' }}
           kubectl rollout status deployment/backend --timeout=10m -n ${{ vars.PROD_NAMESPACE || 'default' }}
           
           # Vérification finale
-          kubectl get pods,svc,ingress -n ${{ vars.PROD_NAMESPACE || 'default' }} -o wide
+          kubectl get all -n ${{ vars.PROD_NAMESPACE || 'default' }}
           kubectl get events -n ${{ vars.PROD_NAMESPACE || 'default' }} --sort-by=.metadata.creationTimestamp

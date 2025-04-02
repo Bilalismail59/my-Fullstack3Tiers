@@ -3,8 +3,9 @@ kind: Service
 metadata:
   name: backend-service
 spec:
-  ports:
-  - port: 80  # Anciennement 8080
-    targetPort: 80
   selector:
     app: backend
+  ports:
+    - protocol: TCP
+      port: 8081      # Port externe du Service
+      targetPort: 8081  # Doit matcher containerPort
