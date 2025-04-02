@@ -91,7 +91,7 @@ jobs:
           EOSSH
   
   production:
-    name: Deploy to Production ()
+    name: Deploy to Production
     needs: build
     runs-on: ubuntu-22.04
     if: github.ref == 'refs/heads/main'
@@ -99,19 +99,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Configure Kubernetes
+      - name: Setup Kubernetes
         run: |
           # Création sécurisée du fichier kubeconfig avec le contenu du secret
           mkdir -p ~/.kube
-          echo "${{ secrets.KUBECONFIG }}" > "$KUBECONFIG"
-          chmod 600 "$KUBECONFIG"
+          echo "${{ secrets.KUBECONFIG }}" > config
+          chmod 600 config
           
           # Vérification de la configuration
-          kubectl config view --raw
-          kubectl cluster-info
-          
-          # Liste les noeuds pour vérifier la connexion
-          kubectl get nodes
+          export KUBECONFIG=$(pwd)/config
+          kubectl config view
+          kubectl get nodes            
           
           # Vérifie l'accès au namespace
           kubectl get ns ${{ vars.PROD_NAMESPACE || 'default' }}

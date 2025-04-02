@@ -1,2 +1,4 @@
 .aws/credentials
 .ssh/labsuser.pem
+kubeconfig.yaml
+.kube/
