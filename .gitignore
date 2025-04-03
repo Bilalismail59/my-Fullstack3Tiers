@@ -2,3 +2,5 @@
 .ssh/labsuser.pem
 kubeconfig.yaml
 .kube/
+kubectl
+terraform/.terraform/
