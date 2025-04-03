@@ -1,6 +1,9 @@
 ---
-- name: Déployer la base de données
-  hosts: database
-  become: yes
-  roles:
-    - database
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-secret
+type: Opaque
+data:
+  host: <base64-encoded-mysql-host>
+  password: <base64-encoded-mysql-password>

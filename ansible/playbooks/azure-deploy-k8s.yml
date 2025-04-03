@@ -1,0 +1,19 @@
+# ansible/playbooks/azure-deploy-k8s.yml
+---
+- name: Déployer sur AKS
+  hosts: localhost
+  connection: local
+  vars_files:
+    - ../inventories/azure/group_vars/all.yml
+
+  tasks:
+    - name: Appliquer les configurations K8s
+      kubernetes.core.k8s:
+        state: present
+        src: "../../k8s/{{ item }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+      loop:
+        - backend.yaml
+        - frontend.yaml
+        - database.yaml
+        - traefik.yaml

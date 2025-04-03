@@ -1,7 +1,7 @@
-output "master_ip" {
-  value = aws_instance.master.public_ip
+output "aks_name" {
+  value = azurerm_kubernetes_cluster.aks.name
 }
 
-output "worker_ips" {
-  value = aws_instance.worker[*].public_ip
+output "resource_group_name" {
+  value = azurerm_resource_group.main.name
 }

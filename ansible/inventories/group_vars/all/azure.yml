@@ -1,0 +1,7 @@
+azure_resource_group: myResourceGroup
+azure_location: francecentral
+aks_cluster_name: myAKSCluster
+
+# Compatible avec vos variables existantes
+wp_db_host: "base-donnee"
+wp_db_name: "wordpress"

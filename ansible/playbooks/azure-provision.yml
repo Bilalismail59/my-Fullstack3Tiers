@@ -1,0 +1,25 @@
+---
+- name: Provisionner l'infrastructure Azure
+  hosts: localhost
+  connection: local
+  vars:
+    resource_group: myResourceGroup
+    location: francecentral
+    k8s_cluster_name: myAKSCluster
+
+  tasks:
+    - name: Créer le Resource Group
+      azure.azcollection.azure_rm_resourcegroup:
+        name: "{{ resource_group }}"
+        location: "{{ location }}"
+
+    - name: Créer le cluster AKS
+      azure.azcollection.azure_rm_aks:
+        resource_group: "{{ resource_group }}"
+        name: "{{ k8s_cluster_name }}"
+        dns_prefix: "{{ k8s_cluster_name }}"
+        kubernetes_version: "1.25.6"
+        agent_pool_profiles:
+          - name: default
+            count: 3
+            vm_size: Standard_B2s
