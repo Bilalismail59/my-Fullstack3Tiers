@@ -4,3 +4,6 @@ kubeconfig.yaml
 .kube/
 kubectl
 terraform/.terraform/
+.terraform/
+*.tfstate
+*.tfstate.backup
