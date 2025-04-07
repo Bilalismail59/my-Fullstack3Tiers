@@ -1,60 +1,31 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: base-donnee
+  name: database
+  namespace: production
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: base-donnee
+      app: database
   template:
     metadata:
       labels:
-        app: base-donnee
+        app: database
     spec:
       containers:
-        - name: base-donnee
-          image: mysql:8
-          env:
-            - name: MYSQL_ROOT_PASSWORD
-              value: "root_pass"
-            - name: MYSQL_DATABASE
-              value: "wordpress"
-            - name: MYSQL_USER
-              value: "wp_user"
-            - name: MYSQL_PASSWORD
-              value: "wp_pass"
+        - name: mysql
+          image: mysql:latest
           ports:
             - containerPort: 3306
-          volumeMounts:
-            - name: mysql-data
-              mountPath: /var/lib/mysql
-      volumes:
-        - name: mysql-data
-          persistentVolumeClaim:
-            claimName: mysql-pvc
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: base-donnee
-  labels:
-    app: base-donnee
-spec:
-  selector:
-    app: base-donnee
-  ports:
-    - protocol: TCP
-      port: 3306
-      targetPort: 3306
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: mysql-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5Gi
+          resources:
+            requests:
+              cpu: "200m"      # Requête de CPU (200 milliCPU)
+              memory: "512Mi"   # Requête de mémoire (512 MiB)
+            limits:
+              cpu: "500m"      # Limite de CPU (500 milliCPU)
+              memory: "1Gi"    # Limite de mémoire (1 GiB)
+          envFrom:
+            - secretRef:
+                name: mysql-secret
+

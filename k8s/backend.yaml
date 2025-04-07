@@ -2,8 +2,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: backend
+  namespace: production
 spec:
-  replicas: 3
+  replicas: 2
   selector:
     matchLabels:
       app: backend
@@ -15,47 +16,37 @@ spec:
       containers:
         - name: backend
           image: wordpress:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "200m"      # Requête de CPU (200 milliCPU)
+              memory: "512Mi"   # Requête de mémoire (512 MiB)
+            limits:
+              cpu: "500m"      # Limite de CPU (500 milliCPU)
+              memory: "1Gi"    # Limite de mémoire (1 GiB)
           env:
             - name: WORDPRESS_DB_HOST
-              value: "base-donnee:3306"
+              value: database:3306
             - name: WORDPRESS_DB_NAME
-              value: "wordpress"
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_DATABASE
             - name: WORDPRESS_DB_USER
-              value: "wp_user"
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_USER
             - name: WORDPRESS_DB_PASSWORD
-              value: "wp_pass"
-          ports:
-            - containerPort: 80  # Changé de 80 à 8081
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: backend
-  labels:
-    app: backend
-spec:
-  selector:
-    app: backend
-  ports:
-    - protocol: TCP
-      port: 80     # Port externe du service
-      targetPort: 80 # Doit correspondre au containerPort
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: backend-ingress
-  annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: web
-spec:
-  rules:
-    - host: backend.prod.local
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: backend
-                port:
-                  number: 80  # Changé de 80 à 8081
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_PASSWORD
+            - name: WORDPRESS_CONFIG_EXTRA
+              value: |
+                define('WP_SITEURL', 'http://' . $_SERVER['HTTP_HOST'] . ':8081');
+                define('WP_HOME', 'http://' . $_SERVER['HTTP_HOST'] . ':8081');
+            - name: WORDPRESS_DEBUG
+              value: "1"
+
