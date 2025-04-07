@@ -6,4 +6,7 @@ kubectl
 terraform/.terraform/
 .terraform/
 *.tfstate
+*.tfstate.backup# Terraform
+*.tfstate
 *.tfstate.backup
+.terraform.lock.hcl
