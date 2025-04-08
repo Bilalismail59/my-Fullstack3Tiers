@@ -8,6 +8,7 @@ on:
       - 'frontend/**'
       - 'backend/**'
       - '.github/workflows/ci-cd.yml'
+  workflow_dispatch:  # Ajoutez cette ligne pour activer le déclenchement manuel    
 
 env:
   DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
