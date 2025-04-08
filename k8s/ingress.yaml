@@ -5,31 +5,31 @@ metadata:
   namespace: production
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
   ingressClassName: nginx
   rules:
-    - host: myapp.local  # ou myapp.local si tu utilises /etc/hosts
-      http:
-        paths:
-          - path: /frontend(/|$)(.*)
-            pathType: Prefix
-            backend:
-              service:
-                name: frontend
-                port:
-                  number: 80
-          - path: /backend(/|$)(.*)
-            pathType: Prefix
-            backend:
-              service:
-                name: backend-service
-                port:
-                  number: 80
-          - path: /netdata(/|$)(.*)
-            pathType: Prefix
-            backend:
-              service:
-                name: netdata
-                port:
-                  number: 19999
-
+  - host: myapp.local
+    http:
+      paths:
+      - path: /frontend(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: frontend-service  # Doit correspondre au nom de votre Service
+            port: 
+              number: 80
+      - path: /backend(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: backend-service
+            port:
+              number: 8081  # Doit correspondre au port de votre Service
+      - path: /netdata(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: netdata
+            port:
+              number: 19999
