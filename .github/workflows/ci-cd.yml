@@ -54,8 +54,8 @@ jobs:
       - name: Build Backend
         uses: docker/build-push-action@v4
         with:
-          context: .
-          file: backend/Dockerfile
+          context: ./
+          file: ./backend/Dockerfile
           push: true
           tags: |
             ${{ env.BACKEND_IMAGE }}:latest
@@ -102,14 +102,14 @@ jobs:
         run: |
           # Création sécurisée du fichier kubeconfig avec le contenu du secret
           mkdir -p ~/.kube
-          echo "${{ secrets.KUBECONFIG }}" > config
-          chmod 600 config
-          
+          echo "${{ secrets.KUBECONFIG }}" | base64 --decode > ~/.kube/config
+          chmod 600 ~/.kube/config
+
           # Vérification de la configuration
-          export KUBECONFIG=$(pwd)/config
+          export KUBECONFIG=~/.kube/config
           kubectl config view
-          kubectl get nodes            
-          
+          kubectl get nodes
+            
           # Vérifie l'accès au namespace
           kubectl get ns ${{ vars.PROD_NAMESPACE || 'default' }}
 
