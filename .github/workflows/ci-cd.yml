@@ -103,6 +103,11 @@ jobs:
           # Création sécurisée du fichier kubeconfig avec le contenu du secret
           mkdir -p ~/.kube
           echo "${{ secrets.KUBECONFIG }}" | base64 --decode > ~/.kube/config
+
+          # Vérification de la présence du fichier kubeconfig
+          ls -l ~/.kube/config
+
+          # Donner les bonnes permissions au fichier
           chmod 600 ~/.kube/config
 
           # Vérification de la configuration
