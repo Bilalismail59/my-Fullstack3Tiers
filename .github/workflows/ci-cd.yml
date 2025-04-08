@@ -13,7 +13,7 @@ env:
   DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
   FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/frontend
   BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/backend
-  KUBECONFIG: ${{ github.workspace }}/kubeconfig.yaml  # Définition centralisée
+  KUBECONFIG: ${{ secrets.KUBECONFIG }}  # Définition centralisée
 
 jobs:
   build:
