@@ -109,14 +109,11 @@ jobs:
           export KUBECONFIG=~/.kube/config
           kubectl config view
           kubectl get nodes
-            
-          # Vérifie l'accès au namespace
-          kubectl get ns ${{ vars.PROD_NAMESPACE || 'default' }}
 
       - name: Deploy to Kubernetes
         run: |
           # Applique les configurations avec validation
-          kubectl apply -f prod/k8s/ --server-side=true --validate=true
+          kubectl apply -f k8s/ --server-side=true --validate=true
           
           # Vérifie l'état des déploiements
           kubectl rollout status deployment/frontend --timeout=10m -n ${{ vars.PROD_NAMESPACE || 'default' }}
