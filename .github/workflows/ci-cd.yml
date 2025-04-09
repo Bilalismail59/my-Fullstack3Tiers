@@ -106,6 +106,10 @@ jobs:
             --file ~/.kube/config \
             --overwrite-existing
           chmod 600 ~/.kube/config
+          
+      - name: Get AKS credentials     
+        run: | 
+          kubectl apply -f k8s/ --server-side=true --validate=true  
 
       #- name: Deploy to AKS
       #  run: |
