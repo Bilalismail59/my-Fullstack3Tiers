@@ -12,9 +12,9 @@ RUN curl -o /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh
     && chmod +x /usr/local/bin/wp
 
 # Copier nos fichiers
-COPY backend/docker-entrypoint.sh /usr/local/bin/
-COPY backend/scripts/seed-wp.sh /usr/local/bin/
-COPY backend/wp-config.php /var/www/html/
+#COPY backend/docker-entrypoint.sh /usr/local/bin/
+#COPY backend/scripts/seed-wp.sh /usr/local/bin/
+#COPY backend/wp-config.php /var/www/html/
 #COPY backend/.htaccess /var/www/html/ 
 
 # Permissions
