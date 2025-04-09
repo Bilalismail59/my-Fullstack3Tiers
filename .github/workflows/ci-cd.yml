@@ -4,17 +4,18 @@ on:
   push:
     branches:
       - main
+      - develop  # Ajout pour déclencher sur la branche develop
     paths:
       - 'frontend/**'
       - 'backend/**'
       - '.github/workflows/ci-cd.yml'
-      - 'k8s/**'  # Ajout des fichiers Kubernetes
+      - 'k8s/**'
 
 env:
   DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
   FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/frontend
   BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/backend
-  K8S_NAMESPACE: production  # Namespace Kubernetes
+  K8S_NAMESPACE: production
 
 jobs:
   build:
@@ -37,25 +38,55 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./frontend
+          file: ./frontend/Dockerfile
           push: true
           tags: |
             ${{ env.FRONTEND_IMAGE }}:latest
             ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
+          build-args: |
+            NODE_ENV=production
 
       - name: Build & Push Backend
         uses: docker/build-push-action@v4
         with:
           context: ./backend
+          file: ./backend/Dockerfile
           push: true
           tags: |
             ${{ env.BACKEND_IMAGE }}:latest
             ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
+          build-args: |
+            NODE_ENV=production
 
-  deploy:
-    name: Deploy to AKS
+  preprod:
+    name: Deploy to Preprod
     needs: build
     runs-on: ubuntu-22.04
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/develop'  # Se déclenche sur push vers develop
+    steps:
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+
+      - name: Deploy to Preprod
+        run: |
+          ssh -o StrictHostKeyChecking=no \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOSSH'
+          cd /path/to/preprod
+          git pull origin develop
+          docker compose down
+          docker compose pull --include-deps
+          docker compose up -d --build --remove-orphans
+          docker image prune -af
+          EOSSH
+
+  production:
+    name: Deploy to Production
+    needs: build
+    runs-on: ubuntu-22.04
+    if: github.ref == 'refs/heads/main'  # Se déclenche sur push vers main
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -76,14 +107,14 @@ jobs:
 
       - name: Deploy to AKS
         run: |
-          # Mise à jour des images dans les deployments
+          # Mise à jour des images
           kubectl set image deployment/frontend \
             frontend=${{ env.FRONTEND_IMAGE }}:${{ github.sha }} -n ${{ env.K8S_NAMESPACE }}
           
           kubectl set image deployment/backend \
             backend=${{ env.BACKEND_IMAGE }}:${{ github.sha }} -n ${{ env.K8S_NAMESPACE }}
 
-          # Vérification du déploiement
+          # Vérification
           kubectl rollout status deployment/frontend -n ${{ env.K8S_NAMESPACE }} --timeout=5m
           kubectl rollout status deployment/backend -n ${{ env.K8S_NAMESPACE }} --timeout=5m
 
