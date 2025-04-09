@@ -12,8 +12,8 @@ on:
 
 env:
   DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
-  FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}
-  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}
+  FRONTEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/frontend
+  BACKEND_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/backend
   KUBECONFIG: ${{ secrets.KUBECONFIG }}  # Définition centralisée
 
 jobs:
