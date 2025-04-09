@@ -107,24 +107,24 @@ jobs:
             --overwrite-existing
           chmod 600 ~/.kube/config
 
-      - name: Deploy to AKS
-        run: |
-          # Update container images
-          kubectl set image deployment/frontend \
-            frontend=${{ env.FRONTEND_IMAGE }}:${{ github.sha }} -n ${{ env.K8S_NAMESPACE }}
-          
-          kubectl set image deployment/backend \
-            backend=${{ env.BACKEND_IMAGE }}:${{ github.sha }} -n ${{ env.K8S_NAMESPACE }}
+      #- name: Deploy to AKS
+      #  run: |
+      #    # Update container images
+      #    kubectl set image deployment/frontend \
+      #      frontend=${{ env.FRONTEND_IMAGE }}:${{ github.sha }} -n ${{ env.K8S_NAMESPACE }}
+      #    
+      #    kubectl set image deployment/backend \
+      #      backend=${{ env.BACKEND_IMAGE }}:${{ github.sha }} -n ${{ env.K8S_NAMESPACE }}
 
           # Verify deployments
-          kubectl rollout status deployment/frontend -n ${{ env.K8S_NAMESPACE }} --timeout=10m
-          kubectl rollout status deployment/backend -n ${{ env.K8S_NAMESPACE }} --timeout=10m
+      #    kubectl rollout status deployment/frontend -n ${{ env.K8S_NAMESPACE }} --timeout=10m
+      #    kubectl rollout status deployment/backend -n ${{ env.K8S_NAMESPACE }} --timeout=10m
 
           # Final checks
-          kubectl get pods,svc,ingress -n ${{ env.K8S_NAMESPACE }}
-          kubectl get events -n ${{ env.K8S_NAMESPACE }} --sort-by=.metadata.creationTimestamp
+      #    kubectl get pods,svc,ingress -n ${{ env.K8S_NAMESPACE }}
+      #    kubectl get events -n ${{ env.K8S_NAMESPACE }} --sort-by=.metadata.creationTimestamp
 
-      - name: Verify Ingress
-        run: |
-          echo "Application URL:"
-          kubectl get ingress my-ingress -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+      #- name: Verify Ingress
+      #  run: |
+      #    echo "Application URL:"
+      #    kubectl get ingress my-ingress -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
