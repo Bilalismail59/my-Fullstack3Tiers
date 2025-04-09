@@ -16,6 +16,7 @@ env:
   K8S_NAMESPACE: production
   CLUSTER_NAME: fullstack3tiers-aks
   RESOURCE_GROUP: fullstack3tiers-rg
+  AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
 
 jobs:
   build:
@@ -27,8 +28,6 @@ jobs:
 
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v2
-        with:
-          driver: docker-container
 
       - name: Login to Docker Hub
         uses: docker/login-action@v2
@@ -40,49 +39,15 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: ./frontend
-          file: ./frontend/Dockerfile
           push: true
-          tags: |
-            ${{ env.FRONTEND_IMAGE }}:latest
-            ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ env.FRONTEND_IMAGE }}:${{ github.sha }}
 
       - name: Build & Push Backend
         uses: docker/build-push-action@v4
         with:
           context: ./backend
-          file: ./backend/Dockerfile
           push: true
-          tags: |
-            ${{ env.BACKEND_IMAGE }}:latest
-            ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  preprod:
-    name: Deploy to Preprod
-    needs: build
-    runs-on: ubuntu-22.04
-    if: github.ref == 'refs/heads/develop'
-    steps:
-      - name: Install SSH key
-        uses: shimataro/ssh-key-action@v2
-        with:
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
-
-      - name: Deploy to Preprod
-        run: |
-          ssh -o StrictHostKeyChecking=no \
-            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOSSH'
-          cd /path/to/preprod
-          git pull origin develop
-          docker compose down
-          docker compose pull --include-deps
-          docker compose up -d --build --remove-orphans
-          docker image prune -af
-          EOSSH
+          tags: ${{ env.BACKEND_IMAGE }}:${{ github.sha }}
 
   production:
     name: Deploy to AKS
@@ -96,39 +61,33 @@ jobs:
       - name: Azure Login
         uses: azure/login@v1
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          creds: ${{ env.AZURE_CREDENTIALS }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
 
       - name: Get AKS credentials
         run: |
           az aks get-credentials \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --name ${{ env.CLUSTER_NAME }} \
-            --file ~/.kube/config \
             --overwrite-existing
-          chmod 600 ~/.kube/config
-          
-      - name: Get AKS credentials     
-        run: | 
-          kubectl apply -f k8s/ --server-side=true --validate=true  
 
-      #- name: Deploy to AKS
-      #  run: |
-      #    # Update container images
-      #    kubectl set image deployment/frontend \
-      #      frontend=${{ env.FRONTEND_IMAGE }}:${{ github.sha }} -n ${{ env.K8S_NAMESPACE }}
-      #    
-      #    kubectl set image deployment/backend \
-      #      backend=${{ env.BACKEND_IMAGE }}:${{ github.sha }} -n ${{ env.K8S_NAMESPACE }}
+      - name: Deploy to AKS
+        run: |
+          # Apply all Kubernetes manifests
+          kubectl apply -f k8s/ -n ${{ env.K8S_NAMESPACE }} --server-side --validate=true
+          
+          # Update images
+          kubectl set image deployment/frontend \
+            frontend=${{ env.FRONTEND_IMAGE }}:${{ github.sha }} -n ${{ env.K8S_NAMESPACE }}
+          
+          kubectl set image deployment/backend \
+            backend=${{ env.BACKEND_IMAGE }}:${{ github.sha }} -n ${{ env.K8S_NAMESPACE }}
 
           # Verify deployments
-      #    kubectl rollout status deployment/frontend -n ${{ env.K8S_NAMESPACE }} --timeout=10m
-      #    kubectl rollout status deployment/backend -n ${{ env.K8S_NAMESPACE }} --timeout=10m
+          kubectl rollout status deployment/frontend -n ${{ env.K8S_NAMESPACE }} --timeout=10m
+          kubectl rollout status deployment/backend -n ${{ env.K8S_NAMESPACE }} --timeout=10m
 
-          # Final checks
-      #    kubectl get pods,svc,ingress -n ${{ env.K8S_NAMESPACE }}
-      #    kubectl get events -n ${{ env.K8S_NAMESPACE }} --sort-by=.metadata.creationTimestamp
-
-      #- name: Verify Ingress
-      #  run: |
-      #    echo "Application URL:"
-      #    kubectl get ingress my-ingress -n ${{ env.K8S_NAMESPACE }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+          # Show resources
+          kubectl get pods,svc,ingress -n ${{ env.K8S_NAMESPACE }}
