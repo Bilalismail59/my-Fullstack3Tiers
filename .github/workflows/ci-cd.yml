@@ -58,23 +58,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Azure Login
-        uses: azure/login@v1
-        with:
-          creds: ${{ env.AZURE_CREDENTIALS }}
+      #- name: Azure Login
+      #  uses: azure/login@v1
+      #  with:
+      #    creds: ${{ env.AZURE_CREDENTIALS }}
 
       - name: Install kubectl
         uses: azure/setup-kubectl@v3
 
-      - name: Get AKS credentials
-        run: |
-          az aks get-credentials \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --name ${{ env.CLUSTER_NAME }} \
-            --overwrite-existing
+      #- name: Get AKS credentials
+      #  run: |
+      #    az aks get-credentials \
+      #      --resource-group ${{ env.RESOURCE_GROUP }} \
+      #      --name ${{ env.CLUSTER_NAME }} \
+      #      --overwrite-existing
 
       - name: Deploy to AKS
         run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" > ~/.kube/config
+          chmod 600 ~/.kube/config
           # Apply all Kubernetes manifests
           kubectl apply -f k8s/ -n ${{ env.K8S_NAMESPACE }} --server-side --validate=true
           
