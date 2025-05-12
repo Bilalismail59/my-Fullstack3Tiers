@@ -1,25 +1,28 @@
+version: '3.8'
+
 services:
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
     image: backend:latest
+    hostname: wordpress
     ports:
-      - "1515:80"  # WordPress accessible sur le port 1515
+      - "1515:80"
     volumes:
-      - ./backend/wp-config.php:/var/www/html/wp-config.php   # Montage du thème/développement
-      - wordpress_plugins:/var/www/html/wp-content/plugins  # Persistance plugins
-      - wordpress_uploads:/var/www/html/wp-content/uploads  # Persistance médias
+      - ./backend/wp-config.php:/var/www/html/wp-config.php
+      - wordpress_plugins:/var/www/html/wp-content/plugins
+      - wordpress_uploads:/var/www/html/wp-content/uploads
     environment:
-      WORDPRESS_DB_HOST: base_donnee:3306
-      WORDPRESS_DB_NAME: wordpress
-      WORDPRESS_DB_USER: wp_user
-      WORDPRESS_DB_PASSWORD: wp_pass
-      WORDPRESS_SITEURL: http://localhost:1515
-      WORDPRESS_TITLE: Mon_FullStack3Tiers
-      WORDPRESS_ADMIN_USER: admin
-      WORDPRESS_ADMIN_PASSWORD: admin123
-      WORDPRESS_ADMIN_EMAIL: admin@example.com
+      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_SITEURL: ${WORDPRESS_SITEURL}
+      WORDPRESS_TITLE: ${WORDPRESS_TITLE}
+      WORDPRESS_ADMIN_USER: ${WORDPRESS_ADMIN_USER}
+      WORDPRESS_ADMIN_PASSWORD: ${WORDPRESS_ADMIN_PASSWORD}
+      WORDPRESS_ADMIN_EMAIL: ${WORDPRESS_ADMIN_EMAIL}
       WORDPRESS_CONFIG_EXTRA: |
         define('WP_DEBUG', true);
         define('WP_MEMORY_LIMIT', '256M');
@@ -29,15 +32,17 @@ services:
       - "traefik.http.routers.backend.rule=Host(`backend.local`)"
       - "traefik.http.routers.backend.entrypoints=web"
       - "traefik.http.services.backend.loadbalancer.server.port=80"
+      - "prometheus.scrape=true"
+      - "prometheus.port=80"
     depends_on:
       base_donnee:
         condition: service_healthy
     networks:
       - web
 
- # Base de données MySQL
   base_donnee:
     image: mysql:8
+    hostname: mysql
     environment:
       MYSQL_ROOT_PASSWORD: root_pass
       MYSQL_DATABASE: wordpress
@@ -45,72 +50,139 @@ services:
       MYSQL_PASSWORD: wp_pass
     volumes:
       - mysql_data:/var/lib/mysql
-    ports:
-    - "3306:3306"
     healthcheck:
-     test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
-     interval: 5s
-     timeout: 5s
-     retries: 10
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -proot_pass"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
-    - web
+      - web
 
-  # Frontend (Nginx)
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    image: frontend:latest  # Nom personnalisé pour Docker Hub
+    image: frontend:latest
+    hostname: frontend
     ports:
-      - "8082:80"  # Frontend accessible sur le port 8082
+      - "8082:80"
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.frontend.rule=Host(`frontend.local`)"
       - "traefik.http.routers.frontend.entrypoints=web"
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
+      - "prometheus.scrape=true"
+      - "prometheus.port=80"
     depends_on:
-      backend:
-        condition: service_started
+      - backend
     networks:
       - web
 
   traefik:
     image: traefik:v3.0
+    hostname: traefik
     command:
-      - "--api.insecure=true"  # Activer l'API Traefik (non sécurisée, pour le développement uniquement)
-      - "--providers.docker=true"  # Utiliser Docker comme fournisseur de configuration
-      - "--entrypoints.web.address=:80"  # Point d'entrée HTTP
-      - "--entrypoints.websecure.address=:443"  # Point d'entrée HTTPS
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
     ports:
-      - "8083:80"  # Traefik accessible sur le port 8083 (HTTP)
-      - "443:443"  # Traefik accessible sur le port 443 (HTTPS)
-      - "8080:8080"  # Dashboard Traefik accessible sur le port 8080
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock"  # Accès à l'API Docker
+      - "/var/run/docker.sock:/var/run/docker.sock"
     labels:
       - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.local`)"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.middlewares=auth"
+      - "traefik.http.middlewares.auth.basicauth.users=admin:$$apr1$$9Cv/OMGj$$ZomWQzuQbL.3TRCS81w1m/"
     networks:
       - web
 
   netdata:
     image: netdata/netdata:latest
-    container_name: netdata
+    hostname: netdata
     ports:
-      - "19999:19999"  # Netdata accessible sur le port 19999
+      - "19999:19999"
     environment:
-      - NETDATA_CLAIM_TOKEN=<your-token>  # Remplacez par votre token Netdata
-      - NETDATA_CLAIM_URL=<claim-url>  # Remplacez par l'URL de claim Netdata
+      - NETDATA_CLAIM_TOKEN=${NETDATA_CLAIM_TOKEN}
+      - NETDATA_CLAIM_ROOM=${NETDATA_CLAIM_ROOM}
+      - NETDATA_CLAIM_URL=${NETDATA_CLAIM_URL}
+    volumes:
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.netdata.rule=Host(`netdata.local`)"  # Utiliser un nom de domaine personnalisé
+      - "traefik.http.routers.netdata.rule=Host(`netdata.local`)"
+      - "traefik.http.routers.netdata.entrypoints=web"
       - "traefik.http.services.netdata.loadbalancer.server.port=19999"
+    networks:
+      - web
+
+  prometheus:
+    image: prom/prometheus:latest
+    hostname: prometheus
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+    ports:
+      - "9090:9090"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.prometheus.rule=Host(`prometheus.local`)"
+      - "traefik.http.routers.prometheus.entrypoints=web"
+      - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+    networks:
+      - web
+
+  grafana:
+    image: grafana/grafana:latest
+    hostname: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.local`)"
+      - "traefik.http.routers.grafana.entrypoints=web"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
     networks:
       - web
 
 volumes:
   mysql_data:
+    driver: local
   wordpress_plugins:
+    driver: local
   wordpress_uploads:
+    driver: local
+  grafana_data:
+    driver: local
+  prometheus_data:
+    driver: local
 
 networks:
   web:
