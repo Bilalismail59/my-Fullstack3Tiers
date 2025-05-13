@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: netdata
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: netdata
+  template:
+    metadata:
+      labels:
+        app: netdata
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "19999"
+    spec:
+      containers:
+      - name: netdata
+        image: netdata/netdata:latest
+        ports:
+        - containerPort: 19999
+        volumeMounts:
+        - name: host-proc
+          mountPath: /host/proc
+          readOnly: true
+        - name: host-sys
+          mountPath: /host/sys
+          readOnly: true
+      volumes:
+      - name: host-proc
+        hostPath:
+          path: /proc
+      - name: host-sys
+        hostPath:
+          path: /sys

@@ -1,0 +1,57 @@
+{
+    "title": "WordPress Monitoring",
+    "description": "Dashboard for WordPress metrics",
+    "tags": ["wordpress", "webserver"],
+    "style": "dark",
+    "timezone": "browser",
+    "editable": true,
+    "panels": [
+      {
+        "title": "PHP Requests",
+        "type": "graph",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "rate(php_requests_total[1m])",
+            "legendFormat": "{{endpoint}}"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 6}
+      },
+      {
+        "title": "Database Queries",
+        "type": "graph",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "rate(wordpress_db_queries_total[1m])",
+            "legendFormat": "queries"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 6}
+      },
+      {
+        "title": "Response Time",
+        "type": "graph",
+        "datasource": "Prometheus",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(wordpress_response_time_seconds_bucket[1m])) by (le)",
+            "legendFormat": "p95"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 6, "w": 12, "h": 6}
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "instance",
+          "label": "Instance",
+          "type": "query",
+          "datasource": "Prometheus",
+          "query": "label_values(wordpress_requests_total, instance)"
+        }
+      ]
+    }
+  }
